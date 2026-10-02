@@ -1,72 +1,104 @@
 final long WWB_MIN_SPACING_HZ = 25000L;
+final double WWB_AMPLITUDE_OFFSET_DB = -75.0;
 
-ArrayList<WwbPoint> pendingWwbRows;
-boolean wwbExportInProgress = false;
+ArrayList<RfExportPoint> pendingRawRows;
+ArrayList<RfExportPoint> pendingWwbRows;
+boolean rfExportInProgress = false;
 
-class WwbPoint implements Comparable<WwbPoint> {
+class RfExportPoint implements Comparable<RfExportPoint> {
   long frequencyHz;
-  double amplitudeDbm;
+  double amplitude;
 
-  WwbPoint(long frequencyHz, double amplitudeDbm) {
+  RfExportPoint(long frequencyHz, double amplitude) {
     this.frequencyHz = frequencyHz;
-    this.amplitudeDbm = amplitudeDbm;
+    this.amplitude = amplitude;
   }
 
-  public int compareTo(WwbPoint other) {
+  public int compareTo(RfExportPoint other) {
     if (frequencyHz < other.frequencyHz) return -1;
     if (frequencyHz > other.frequencyHz) return 1;
     return 0;
   }
 }
 
+public void exportRawScan() {
+  double[] snapshot = captureRfSnapshot("Raw Scan");
+  if (snapshot == null) return;
+
+  try {
+    pendingRawRows = buildRawRows(snapshot, startFreq, binStep);
+  }
+  catch (Exception exception) {
+    showExportError("The current RF scan could not be prepared for raw export.", exception);
+    pendingRawRows = null;
+    return;
+  }
+
+  if (pendingRawRows.size() == 0) {
+    showExportError("The current RF scan contains no usable samples.");
+    pendingRawRows = null;
+    return;
+  }
+
+  openExportDialog("Save raw RF scan", "rawExportFileSelected", "rizzieri_rf_raw_");
+}
+
 public void exportToWWB() {
-  if (wwbExportInProgress) {
-    println("WWB export: a save dialog is already open.");
-    return;
-  }
-
-  if (spektrumReader == null) {
-    showWwbError("No RF scanner is available.");
-    return;
-  }
-
-  double[] sourceBuffer;
-  try {
-    sourceBuffer = spektrumReader.getDbmBuffer();
-  }
-  catch (Exception exception) {
-    showWwbError("Unable to capture the current RF scan.", exception);
-    return;
-  }
-
-  if (sourceBuffer == null || sourceBuffer.length == 0) {
-    showWwbError("The current RF scan is empty.");
-    return;
-  }
+  double[] snapshot = captureRfSnapshot("WWB");
+  if (snapshot == null) return;
 
   try {
-    pendingWwbRows = buildWwbRows(sourceBuffer.clone(), startFreq, binStep);
+    pendingWwbRows = buildWwbRows(snapshot, startFreq, binStep);
   }
   catch (Exception exception) {
-    showWwbError("The current RF scan could not be prepared for WWB.", exception);
+    showExportError("The current RF scan could not be prepared for WWB.", exception);
     pendingWwbRows = null;
     return;
   }
 
   if (pendingWwbRows.size() == 0) {
-    showWwbError("The current RF scan contains no usable samples.");
+    showExportError("The current RF scan contains no usable samples.");
     pendingWwbRows = null;
     return;
   }
 
-  String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-  java.io.File suggestedFile = new java.io.File(sketchPath("spektrum_wwb_" + timestamp + ".csv"));
-  wwbExportInProgress = true;
-  selectOutput("Save scan for Shure Wireless Workbench", "wwbExportFileSelected", suggestedFile);
+  openExportDialog("Save scan for Shure Wireless Workbench", "wwbExportFileSelected", "rizzieri_rf_wwb_");
 }
 
-ArrayList<WwbPoint> buildWwbRows(double[] buffer, int sourceStartFreq, int sourceBinStep) {
-  ArrayList<WwbPoint> points = new ArrayList<WwbPoint>();
+double[] captureRfSnapshot(String exportName) {
+  if (rfExportInProgress) {
+    println(exportName + " export: a save dialog is already open.");
+    return null;
+  }
+
+  if (spektrumReader == null) {
+    showExportError("No RF scanner is available.");
+    return null;
+  }
+
+  try {
+    double[] sourceBuffer = spektrumReader.getDbmBuffer();
+    if (sourceBuffer == null || sourceBuffer.length == 0) {
+      showExportError("The current RF scan is empty.");
+      return null;
+    }
+    return sourceBuffer.clone();
+  }
+  catch (Exception exception) {
+    showExportError("Unable to capture the current RF scan.", exception);
+    return null;
+  }
+}
+
+void openExportDialog(String prompt, String callback, String filePrefix) {
+  String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+  java.io.File suggestedFile = new java.io.File(sketchPath(filePrefix + timestamp + ".csv"));
+  rfExportInProgress = true;
+  selectOutput(prompt, callback, suggestedFile);
+}
+
+ArrayList<RfExportPoint> buildRawRows(double[] buffer, int sourceStartFreq, int sourceBinStep) {
+  ArrayList<RfExportPoint> points = new ArrayList<RfExportPoint>();
 
   for (int i = 0; i < buffer.length; i++) {
     double amplitude = buffer[i];
@@ -76,63 +108,120 @@ ArrayList<WwbPoint> buildWwbRows(double[] buffer, int sourceStartFreq, int sourc
     if (rawFrequencyHz < Integer.MIN_VALUE || rawFrequencyHz > Integer.MAX_VALUE) continue;
 
     long correctedFrequencyHz = (long)ifCorrectedFreq((int)rawFrequencyHz);
-    points.add(new WwbPoint(correctedFrequencyHz, amplitude));
+    points.add(new RfExportPoint(correctedFrequencyHz, amplitude));
   }
 
   Collections.sort(points);
-  if (sourceBinStep < WWB_MIN_SPACING_HZ) {
-    points = reduceWwbPoints(points);
-  }
-
-  assertWwbSpacing(points);
+  assertAscending(points);
   return points;
 }
 
-ArrayList<WwbPoint> reduceWwbPoints(ArrayList<WwbPoint> sortedPoints) {
-  ArrayList<WwbPoint> reduced = new ArrayList<WwbPoint>();
+ArrayList<RfExportPoint> buildWwbRows(double[] buffer, int sourceStartFreq, int sourceBinStep) {
+  ArrayList<RfExportPoint> preparedPoints = buildRawRows(buffer, sourceStartFreq, sourceBinStep);
+  if (sourceBinStep < WWB_MIN_SPACING_HZ) {
+    preparedPoints = reduceWwbPoints(preparedPoints);
+  }
+
+  ArrayList<RfExportPoint> adjustedPoints = applyWwbAmplitudeOffset(preparedPoints);
+  assertWwbRows(preparedPoints, adjustedPoints);
+  return adjustedPoints;
+}
+
+ArrayList<RfExportPoint> reduceWwbPoints(ArrayList<RfExportPoint> sortedPoints) {
+  ArrayList<RfExportPoint> reduced = new ArrayList<RfExportPoint>();
   if (sortedPoints.size() == 0) return reduced;
 
-  long windowStartHz = sortedPoints.get(0).frequencyHz;
-  long windowEndHz = windowStartHz + WWB_MIN_SPACING_HZ;
-  WwbPoint strongestPoint = null;
+  long currentGridFrequencyHz = alignToWwbGrid(sortedPoints.get(0).frequencyHz);
+  RfExportPoint strongestPoint = null;
 
-  for (WwbPoint point : sortedPoints) {
-    while (point.frequencyHz >= windowEndHz) {
+  for (RfExportPoint point : sortedPoints) {
+    long pointGridFrequencyHz = alignToWwbGrid(point.frequencyHz);
+    if (pointGridFrequencyHz != currentGridFrequencyHz) {
       if (strongestPoint != null) {
-        // Use the corrected-frequency window start as the WWB frequency. This
-        // keeps exported rows on an exact 25 kHz grid while retaining the
-        // strongest amplitude found anywhere inside the source window.
-        reduced.add(new WwbPoint(windowStartHz, strongestPoint.amplitudeDbm));
-        strongestPoint = null;
+        reduced.add(new RfExportPoint(currentGridFrequencyHz, strongestPoint.amplitude));
       }
-      windowStartHz = windowEndHz;
-      windowEndHz += WWB_MIN_SPACING_HZ;
+      currentGridFrequencyHz = pointGridFrequencyHz;
+      strongestPoint = null;
     }
 
-    if (strongestPoint == null || point.amplitudeDbm > strongestPoint.amplitudeDbm) {
+    if (strongestPoint == null || point.amplitude > strongestPoint.amplitude) {
       strongestPoint = point;
     }
   }
 
   if (strongestPoint != null) {
-    reduced.add(new WwbPoint(windowStartHz, strongestPoint.amplitudeDbm));
+    reduced.add(new RfExportPoint(currentGridFrequencyHz, strongestPoint.amplitude));
   }
 
   return reduced;
 }
 
-void assertWwbSpacing(ArrayList<WwbPoint> points) {
+long alignToWwbGrid(long frequencyHz) {
+  return Math.floorDiv(frequencyHz + WWB_MIN_SPACING_HZ / 2L, WWB_MIN_SPACING_HZ)
+    * WWB_MIN_SPACING_HZ;
+}
+
+ArrayList<RfExportPoint> applyWwbAmplitudeOffset(ArrayList<RfExportPoint> points) {
+  ArrayList<RfExportPoint> adjusted = new ArrayList<RfExportPoint>();
+  for (RfExportPoint point : points) {
+    adjusted.add(new RfExportPoint(point.frequencyHz, point.amplitude + WWB_AMPLITUDE_OFFSET_DB));
+  }
+  return adjusted;
+}
+
+void assertAscending(ArrayList<RfExportPoint> points) {
   for (int i = 1; i < points.size(); i++) {
-    long spacingHz = points.get(i).frequencyHz - points.get(i - 1).frequencyHz;
-    if (spacingHz < WWB_MIN_SPACING_HZ) {
-      throw new IllegalStateException("WWB rows are less than 25 kHz apart.");
+    if (points.get(i).frequencyHz < points.get(i - 1).frequencyHz) {
+      throw new IllegalStateException("RF export frequencies are not ascending.");
     }
   }
 }
 
-public void wwbExportFileSelected(java.io.File selection) {
-  wwbExportInProgress = false;
+void assertWwbRows(ArrayList<RfExportPoint> sourcePoints, ArrayList<RfExportPoint> adjustedPoints) {
+  if (sourcePoints.size() != adjustedPoints.size()) {
+    throw new IllegalStateException("WWB amplitude adjustment changed the row count.");
+  }
 
+  for (int i = 0; i < adjustedPoints.size(); i++) {
+    RfExportPoint sourcePoint = sourcePoints.get(i);
+    RfExportPoint adjustedPoint = adjustedPoints.get(i);
+    if (sourcePoint.frequencyHz != adjustedPoint.frequencyHz
+      || Double.compare(adjustedPoint.amplitude, sourcePoint.amplitude + WWB_AMPLITUDE_OFFSET_DB) != 0) {
+      throw new IllegalStateException("WWB compatibility offset was not applied exactly once.");
+    }
+
+    if (i > 0) {
+      long spacingHz = adjustedPoint.frequencyHz - adjustedPoints.get(i - 1).frequencyHz;
+      if (spacingHz < WWB_MIN_SPACING_HZ) {
+        throw new IllegalStateException("WWB rows are less than 25 kHz apart.");
+      }
+    }
+  }
+}
+
+public void rawExportFileSelected(java.io.File selection) {
+  rfExportInProgress = false;
+  if (selection == null) {
+    pendingRawRows = null;
+    println("Raw RF export cancelled.");
+    return;
+  }
+
+  java.io.File csvFile = ensureCsvExtension(selection);
+  try {
+    writeRawCsv(csvFile, pendingRawRows);
+    showExportSuccess("Raw RF scan saved successfully.", csvFile);
+  }
+  catch (Exception exception) {
+    showExportError("Unable to save the raw RF CSV file.", exception);
+  }
+  finally {
+    pendingRawRows = null;
+  }
+}
+
+public void wwbExportFileSelected(java.io.File selection) {
+  rfExportInProgress = false;
   if (selection == null) {
     pendingWwbRows = null;
     println("WWB export cancelled.");
@@ -142,14 +231,10 @@ public void wwbExportFileSelected(java.io.File selection) {
   java.io.File csvFile = ensureCsvExtension(selection);
   try {
     writeWwbCsv(csvFile, pendingWwbRows);
-    println("WWB export saved: " + csvFile.getAbsolutePath());
-    javax.swing.JOptionPane.showMessageDialog(null,
-      "WWB scan saved successfully.",
-      "Spektrum Rizzieri",
-      javax.swing.JOptionPane.INFORMATION_MESSAGE);
+    showExportSuccess("WWB scan saved successfully.", csvFile);
   }
   catch (Exception exception) {
-    showWwbError("Unable to save the WWB CSV file.", exception);
+    showExportError("Unable to save the WWB CSV file.", exception);
   }
   finally {
     pendingWwbRows = null;
@@ -161,9 +246,18 @@ java.io.File ensureCsvExtension(java.io.File selection) {
   return new java.io.File(selection.getParentFile(), selection.getName() + ".csv");
 }
 
-void writeWwbCsv(java.io.File outputFile, ArrayList<WwbPoint> rows) throws java.io.IOException {
+void writeRawCsv(java.io.File outputFile, ArrayList<RfExportPoint> rows) throws java.io.IOException {
+  writeRfCsv(outputFile, rows, false);
+}
+
+void writeWwbCsv(java.io.File outputFile, ArrayList<RfExportPoint> rows) throws java.io.IOException {
+  writeRfCsv(outputFile, rows, true);
+}
+
+void writeRfCsv(java.io.File outputFile, ArrayList<RfExportPoint> rows, boolean wwbFormat)
+  throws java.io.IOException {
   if (rows == null || rows.size() == 0) {
-    throw new java.io.IOException("No WWB rows are available to save.");
+    throw new java.io.IOException("No RF rows are available to save.");
   }
 
   java.io.BufferedWriter writer = null;
@@ -171,10 +265,14 @@ void writeWwbCsv(java.io.File outputFile, ArrayList<WwbPoint> rows) throws java.
     writer = new java.io.BufferedWriter(
       new java.io.OutputStreamWriter(new java.io.FileOutputStream(outputFile), "UTF-8"));
 
-    for (WwbPoint row : rows) {
-      writer.write(String.format(Locale.US, "%.6f,%.2f",
-        row.frequencyHz / 1000000.0,
-        row.amplitudeDbm));
+    for (RfExportPoint row : rows) {
+      if (wwbFormat) {
+        writer.write(String.format(Locale.US, "%.6f,%.2f",
+          row.frequencyHz / 1000000.0, row.amplitude));
+      } else {
+        writer.write(String.format(Locale.US, "%.6f,%s",
+          row.frequencyHz / 1000000.0, Double.toString(row.amplitude)));
+      }
       writer.newLine();
     }
   }
@@ -183,12 +281,18 @@ void writeWwbCsv(java.io.File outputFile, ArrayList<WwbPoint> rows) throws java.
   }
 }
 
-void showWwbError(String message) {
-  showWwbError(message, null);
+void showExportSuccess(String message, java.io.File csvFile) {
+  println("RF export saved: " + csvFile.getAbsolutePath());
+  javax.swing.JOptionPane.showMessageDialog(null, message, appDisplayName(),
+    javax.swing.JOptionPane.INFORMATION_MESSAGE);
 }
 
-void showWwbError(String message, Exception exception) {
-  println("WWB export error: " + message);
+void showExportError(String message) {
+  showExportError(message, null);
+}
+
+void showExportError(String message, Exception exception) {
+  println("RF export error: " + message);
   if (exception != null) exception.printStackTrace();
-  MsgBox(message, "Spektrum Rizzieri - WWB Export");
+  MsgBox(message, appDisplayName() + " - Export");
 }

@@ -1,10 +1,10 @@
-final String BRANDING_PRODUCT_NAME = "Spektrum Rizzieri";
 final String BRANDING_LOGO_ASSET = "assets/branding/logo.png";
+final float BRANDING_WATERMARK_OPACITY = 0.08;
 
 PImage brandingLogo;
 
 void setupBranding() {
-  surface.setTitle(BRANDING_PRODUCT_NAME);
+  surface.setTitle(appDisplayName());
 
   java.io.File logoFile = new java.io.File(sketchPath("data/" + BRANDING_LOGO_ASSET));
   if (!logoFile.isFile()) {
@@ -31,10 +31,10 @@ void setupBranding() {
 }
 
 void drawBranding() {
-  final float areaX = 15;
-  final float areaY = height - 112;
-  final float areaWidth = 170;
-  final float areaHeight = 96;
+  final float areaWidth = 120;
+  final float areaHeight = 60;
+  final float areaX = 15 + (170 - areaWidth) / 2.0;
+  final float areaY = graphHeight() - 130 - areaHeight - 18;
 
   pushStyle();
   if (brandingLogo != null) {
@@ -50,8 +50,26 @@ void drawBranding() {
   } else {
     fill(#A7A7A7);
     textAlign(CENTER, CENTER);
-    textSize(13);
-    text(BRANDING_PRODUCT_NAME, areaX, areaY, areaWidth, areaHeight);
+    textSize(10);
+    text(appDisplayName(), areaX, areaY, areaWidth, areaHeight);
   }
+  popStyle();
+}
+
+void drawGraphWatermark() {
+  if (brandingLogo == null) return;
+
+  final float maxWidth = graphWidth() * 0.35;
+  final float maxHeight = graphHeight() * 0.35;
+  float imageScale = min(maxWidth / brandingLogo.width, maxHeight / brandingLogo.height);
+  float imageWidth = brandingLogo.width * imageScale;
+  float imageHeight = brandingLogo.height * imageScale;
+  float imageX = graphX() + (graphWidth() - imageWidth) / 2.0;
+  float imageY = graphY() + (graphHeight() - imageHeight) / 2.0;
+
+  pushStyle();
+  imageMode(CORNER);
+  tint(255, round(255 * BRANDING_WATERMARK_OPACITY));
+  image(brandingLogo, imageX, imageY, imageWidth, imageHeight);
   popStyle();
 }

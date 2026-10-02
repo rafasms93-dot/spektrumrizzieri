@@ -1,10 +1,39 @@
-# Spektrum
+# Rizzieri RF Manager
+
+Current product version: **Rizzieri RF Manager v0.1.0**.
+
+Rizzieri RF Manager is based on the original **Spektrum** spectrum analyzer.
+The Spektrum attribution, authors, contributors, copyright, and BSD license are
+preserved in this repository.
 
 [![Travis CI](https://api.travis-ci.com/pavels/spektrum.svg)](https://travis-ci.com/pavels/spektrum/builds)
 
 Spektrum is a spectrum analyzer software for use with [rtl-sdr](http://sdr.osmocom.org/trac/wiki/rtl-sdr).
 
 The biggest advantage is that it can do sweeps across a large frequency span.
+
+RF scan export
+----
+
+The General tab provides two exports based on an isolated snapshot of the current
+`getDbmBuffer()` data. Neither export pauses, restarts, or reconfigures the SDR.
+
+**Export Raw Scan** writes the corrected frequency and original buffer amplitude.
+It removes invalid floating-point samples, sorts by IF-corrected frequency, and
+preserves the source bins without applying the WWB grid or amplitude offset.
+
+**Export to WWB** prepares an interoperability file for Shure Wireless Workbench.
+It applies IF correction, sorts the frequencies, reduces scans finer than 25 kHz
+onto an exact 25 kHz grid using the strongest amplitude in each window, and then
+applies a fixed **-75 dB compatibility/visualization offset**.
+
+The -75 dB adjustment is an operational decision for the Wireless Workbench
+workflow. It is not an absolute metrological calibration of the RTL-SDR or the RF
+signal chain.
+
+Both files are headerless CSV files using a period as decimal separator. Suggested
+names are `rizzieri_rf_raw_YYYYMMDD_HHmmss.csv` and
+`rizzieri_rf_wwb_YYYYMMDD_HHmmss.csv`.
 
 User interface part is written in [Processing](https://processing.org/)
 
@@ -149,7 +178,7 @@ The rtl-sdr branch is located here: [https://github.com/pavels/rtl-sdr](https://
 
 The processing library is here [https://github.com/pavels/processing-rtlspektum-lib](https://github.com/pavels/processing-rtlspektum-lib)
 
-Spektrum Rizzieri branding
+Rizzieri RF Manager branding and versioning
 ----
 
 This customized build displays its replaceable branding asset from:
@@ -160,7 +189,12 @@ Use a valid PNG image. A square canvas of at least 256 x 256 pixels is recommend
 because the same image is also used as the application window icon where supported.
 The interface scales the image proportionally to fit the left control area. If the
 file is absent or cannot be decoded, the application remains functional and shows
-the text label "Spektrum Rizzieri" instead.
+the versioned product name as a text fallback. The same image is drawn as a subtle
+watermark behind the graph at 8% opacity.
+
+The application name and version have a single source of truth in
+`app_identity.pde`. A local Java Preferences entry records the last version whose
+What's New dialog was viewed, so each version is shown once without Internet access.
 
 The Spektrum project attribution, contributors, copyright, and BSD license remain
 unchanged below and in `LICENSE.md`.

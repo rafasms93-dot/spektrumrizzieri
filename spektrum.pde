@@ -581,6 +581,16 @@ void setupControls() {
 
   y += 30;
 
+  cp5.addButton("exportRawScan")
+    .setPosition(x, y)
+    .setSize(width, 20)
+    .setColorBackground(buttonColor)
+    .setColorLabel(buttonColorText)
+    .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Export Raw Scan")
+    ;
+
+  y += 30;
+
   cp5.addButton("exportToWWB")
     .setPosition(x, y)
     .setSize(width, 20)
@@ -1387,7 +1397,7 @@ public void deviceDropdown(int theValue) {
   //============================
 
   if (status < 0) {
-    MsgBox("Can't open rtl-sdr device.", "Spektrum");
+    MsgBox("Can't open rtl-sdr device.", appDisplayName());
     exit();
     return;
   }
@@ -1411,6 +1421,7 @@ void setup() {
   }
 
   setupBranding();
+  showWhatsNewIfNeeded();
 
   devices = Rtlspektrum.getDevices();
   for (String dev : devices) {
@@ -1544,6 +1555,7 @@ void draw() {
   }
 
 
+  drawGraphWatermark();
   drawGraphMatt(scaleMin, scaleMax, startFreq, stopFreq);
 
   double scaleFactor = (double)graphHeight() / (scaleMax - scaleMin);
