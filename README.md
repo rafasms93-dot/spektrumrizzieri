@@ -149,6 +149,22 @@ The rtl-sdr branch is located here: [https://github.com/pavels/rtl-sdr](https://
 
 The processing library is here [https://github.com/pavels/processing-rtlspektum-lib](https://github.com/pavels/processing-rtlspektum-lib)
 
+Spektrum Rizzieri branding
+----
+
+This customized build displays its replaceable branding asset from:
+
+`data/assets/branding/logo.png`
+
+Use a valid PNG image. A square canvas of at least 256 x 256 pixels is recommended
+because the same image is also used as the application window icon where supported.
+The interface scales the image proportionally to fit the left control area. If the
+file is absent or cannot be decoded, the application remains functional and shows
+the text label "Spektrum Rizzieri" instead.
+
+The Spektrum project attribution, contributors, copyright, and BSD license remain
+unchanged below and in `LICENSE.md`.
+
 Development
 ----
 

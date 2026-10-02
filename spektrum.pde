@@ -579,6 +579,16 @@ void setupControls() {
     .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Exit")
     ;
 
+  y += 30;
+
+  cp5.addButton("exportToWWB")
+    .setPosition(x, y)
+    .setSize(width, 20)
+    .setColorBackground(buttonColor)
+    .setColorLabel(buttonColorText)
+    .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Export to WWB")
+    ;
+
   uiLines[uiNextLineIndex++][TAB_GENERAL] = 0;
 
   // TAB MEASURE =============================================================================
@@ -1400,6 +1410,8 @@ void setup() {
     surface.setResizable(true);
   }
 
+  setupBranding();
+
   devices = Rtlspektrum.getDevices();
   for (String dev : devices) {
     println(dev);
@@ -1419,6 +1431,8 @@ void stop() {
 
 void draw() {
   background(color(#222324));
+
+  drawBranding();
 
   if (!setupDone) {
     return;
