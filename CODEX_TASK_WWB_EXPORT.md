@@ -110,6 +110,29 @@ Use Processing/Java-native file selection where practical (for example `selectOu
 
 If the user cancels the dialog, do nothing destructive.
 
+## Branding / logo support
+
+Prepare this customized build to carry the owner's visual identity in addition to the WWB export feature.
+
+Add branding in a way that is isolated from RF/scanning logic.
+
+Requirements:
+
+- create a dedicated branding asset location, preferably `assets/branding/` or the Processing-compatible equivalent used by the project
+- support a primary logo image named `logo.png`
+- display the logo inside the application UI in a non-intrusive area that does not cover the spectrum graph, controls, values, or cursor information
+- where the Processing/runtime packaging mechanism allows it reliably, use a matching application/window icon derived from the provided branding asset
+- keep the original Spektrum attribution and BSD license information intact
+- do not remove or obscure upstream credits
+- if the final logo asset is not yet present, implement a safe fallback so the application still compiles and runs without crashing
+- do not invent a final logo or generate substitute artwork inside the codebase
+- document exactly where the final logo file must be placed and any pixel-size / file-format requirements
+- do not add external UI or image-processing dependencies solely for branding
+
+The customized build may use the working product label `Spektrum Rizzieri` in the window title or a small UI label, provided this does not replace required upstream attribution.
+
+The final visual asset itself will be supplied separately by the owner. The implementation should make replacing `logo.png` straightforward without code changes.
+
 ## Code organization
 
 Prefer keeping the feature isolated.
@@ -129,6 +152,8 @@ Suggested responsibilities inside `wwb_export.pde`:
 - write the CSV
 - handle the save dialog callback
 - report success/failure cleanly
+
+Keep branding concerns separate from the WWB export functions where practical.
 
 Do not add third-party dependencies.
 
@@ -172,6 +197,7 @@ Handle at least:
 - all samples invalid
 - save dialog cancelled
 - file write exception
+- missing optional branding asset
 
 Do not crash the application.
 
@@ -195,6 +221,10 @@ The task is complete only when all of the following are true:
 12. IF-corrected scans export the corrected/display frequency, not the uncorrected tuner frequency.
 13. No unrelated code or dependency is changed.
 14. The result is committed only to `feat/wwb-export`.
+15. The customized build supports a replaceable `logo.png` without requiring code edits.
+16. The application remains functional if the optional branding asset is temporarily absent.
+17. The logo does not obstruct the spectrum graph or operational controls.
+18. Upstream Spektrum attribution and BSD license information remain intact.
 
 ## Verification artifact
 
@@ -213,6 +243,7 @@ When finished, report:
 - files changed
 - implementation summary
 - how the 25 kHz conversion works
+- branding/logo integration points and the required final asset path/specification
 - any assumptions
 - build/compile result
 - manual test steps
