@@ -2,6 +2,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -21,64 +22,82 @@ public class WwbExportTest {
     app.ifType = app.IF_TYPE_NONE;
     app.ifOffset = 0;
 
-    double[] sameSnapshot = new double[] {
+    double[] invalidSamples = new double[] {
       -13.89, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, -20.125
     };
-    ArrayList<spektrum.RfExportPoint> raw = app.buildRawRows(sameSnapshot, 470000000, 25000);
-    ArrayList<spektrum.RfExportPoint> wwb = app.buildWwbRows(sameSnapshot, 470000000, 25000);
-
-    require(raw.size() == 2, "raw export must discard NaN and infinity");
-    require(wwb.size() == 2, "WWB export must discard NaN and infinity");
-    requireClose(raw.get(0).amplitude, -13.89, "raw export must preserve amplitude");
-    requireClose(wwb.get(0).amplitude, -88.89, "WWB must apply -75 dB exactly once");
-    require(raw.get(0).amplitude != wwb.get(0).amplitude,
-      "raw and WWB exports from one snapshot must differ");
+    ArrayList<spektrum.WwbPoint> validRows = app.buildWwbRows(invalidSamples, 470000000, 25000);
+    require(validRows.size() == 2, "stable export must discard NaN and infinities");
+    requireClose(validRows.get(0).amplitudeDbm, -13.89,
+      "stable export must preserve amplitude without a -75 dB transformation");
 
     app.ifType = app.IF_TYPE_BELOW;
     app.ifOffset = 600000000;
-    ArrayList<spektrum.RfExportPoint> reversed = app.buildRawRows(
+    ArrayList<spektrum.WwbPoint> reversed = app.buildWwbRows(
       new double[] {-100.0, -90.0, -80.0}, 100000000, 25000);
     require(reversed.get(0).frequencyHz == 499950000L, "IF-below lower corrected frequency");
     require(reversed.get(2).frequencyHz == 500000000L, "IF-below upper corrected frequency");
-    requireClose(reversed.get(0).amplitude, -80.0, "IF sorting must retain amplitude association");
+    requireClose(reversed.get(0).amplitudeDbm, -80.0,
+      "sorting after IF correction must retain amplitude association");
 
     app.ifType = app.IF_TYPE_NONE;
     double[] fine = new double[40];
-    for (int i = 0; i < fine.length; i++) fine[i] = -120.0;
+    Arrays.fill(fine, -120.0);
     fine[12] = -10.0;
     fine[13] = -20.0;
-    ArrayList<spektrum.RfExportPoint> fineRaw = app.buildRawRows(fine, 450024994, 1000);
-    ArrayList<spektrum.RfExportPoint> fineWwb = app.buildWwbRows(fine, 450024994, 1000);
+    ArrayList<spektrum.WwbPoint> reduced = app.buildWwbRows(fine, 450024994, 1000);
+    require(reduced.size() == 2, "stable sequential-window reduction row count");
+    require(reduced.get(0).frequencyHz == 450024994L,
+      "stable reduction must remain anchored at the first corrected frequency");
+    require(reduced.get(1).frequencyHz == 450049994L,
+      "stable reduction must advance by exactly 25 kHz");
+    requireClose(reduced.get(0).amplitudeDbm, -10.0,
+      "stable reduction must preserve the strongest amplitude without offset");
 
-    require(fineRaw.size() == 40, "raw export must preserve fine bins");
-    require(fineWwb.get(0).frequencyHz == 450025000L, "WWB frequency must align to clean grid");
-    require(fineWwb.get(1).frequencyHz == 450050000L, "WWB grid must advance exactly 25 kHz");
-    requireClose(fineWwb.get(0).amplitude, -85.0, "first WWB window must preserve peak and offset");
-    requireClose(fineWwb.get(1).amplitude, -95.0, "second WWB window must preserve peak and offset");
-    for (int i = 1; i < fineWwb.size(); i++) {
-      require(fineWwb.get(i).frequencyHz - fineWwb.get(i - 1).frequencyHz >= 25000L,
-        "WWB rows must be at least 25 kHz apart");
+    File fixture = new File(System.getProperty(
+      "wwb.fixture", "test-data/sample_wwb_scan.csv"));
+    List<String> expectedFixture = Files.readAllLines(fixture.toPath(), StandardCharsets.UTF_8);
+    double[] fixtureAmplitudes = new double[expectedFixture.size()];
+    for (int i = 0; i < expectedFixture.size(); i++) {
+      fixtureAmplitudes[i] = Double.parseDouble(expectedFixture.get(i).split(",")[1]);
     }
 
+    ArrayList<spektrum.WwbPoint> fixtureRows = app.buildWwbRows(
+      fixtureAmplitudes, 470000000, 25000);
+    File generatedCsv = File.createTempFile("wwb-stable-regression-", ".csv");
+
     Locale previous = Locale.getDefault();
-    Locale.setDefault(Locale.GERMANY);
-    File rawCsv = File.createTempFile("raw-export-test-", ".csv");
-    File wwbCsv = File.createTempFile("wwb-export-test-", ".csv");
-    app.writeRawCsv(rawCsv, raw);
-    app.writeWwbCsv(wwbCsv, wwb);
-    List<String> rawLines = Files.readAllLines(rawCsv.toPath(), StandardCharsets.UTF_8);
-    List<String> wwbLines = Files.readAllLines(wwbCsv.toPath(), StandardCharsets.UTF_8);
-    Locale.setDefault(previous);
+    try {
+      Locale.setDefault(Locale.GERMANY);
+      app.writeWwbCsv(generatedCsv, fixtureRows);
+    }
+    finally {
+      Locale.setDefault(previous);
+    }
 
-    require(rawLines.get(0).equals("470.000000,-13.89"),
-      "raw CSV must use Locale.US and preserve amplitude precision");
-    require(wwbLines.get(0).equals("470.000000,-88.89"),
-      "WWB CSV must use six/two decimals and Locale.US");
-    require(!rawLines.get(0).toLowerCase(Locale.US).contains("frequency"), "raw CSV must not have a header");
-    require(!wwbLines.get(0).toLowerCase(Locale.US).contains("frequency"), "WWB CSV must not have a header");
+    List<String> generatedFixture = Files.readAllLines(
+      generatedCsv.toPath(), StandardCharsets.UTF_8);
+    require(generatedFixture.equals(expectedFixture),
+      "generated CSV must match the b1755bc4-compatible fixture exactly");
+    require(!generatedFixture.get(0).toLowerCase(Locale.US).contains("frequency"),
+      "WWB CSV must not have a header");
+    require(generatedFixture.get(0).equals("470.000000,-109.00"),
+      "WWB CSV must use Locale.US formatting and no -75 dB transformation");
+    generatedCsv.delete();
 
-    rawCsv.delete();
-    wwbCsv.delete();
-    System.out.println("RF export tests passed: raw fidelity, WWB offset/grid, IF, spacing, invalid samples, locale.");
+    double[] largeFixture = new double[250000];
+    for (int i = 0; i < largeFixture.length; i++) {
+      largeFixture[i] = -120.0 + (i % 71) * 0.25;
+    }
+    long startedAt = System.nanoTime();
+    ArrayList<spektrum.WwbPoint> largeRows = app.buildWwbRows(
+      largeFixture, 100000000, 1000);
+    long elapsedMillis = (System.nanoTime() - startedAt) / 1000000L;
+    require(largeRows.size() == 10000, "large fixture reduction row count");
+    require(elapsedMillis < 10000L, "large fixture shows a gross processing regression");
+
+    System.out.println("WWB stable-export regression tests passed.");
+    System.out.println("LARGE_FIXTURE_SAMPLES=250000");
+    System.out.println("LARGE_FIXTURE_ROWS=" + largeRows.size());
+    System.out.println("LARGE_FIXTURE_MS=" + elapsedMillis);
   }
 }

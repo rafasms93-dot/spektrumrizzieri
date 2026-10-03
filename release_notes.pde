@@ -10,23 +10,19 @@ void showWhatsNewIfNeeded() {
     lastViewedVersion = preferences.get(WHATS_NEW_VERSION_KEY, "");
   }
   catch (Exception exception) {
-    println("Unable to read What's New preference; the dialog will still be shown.");
+    println("Não foi possível ler a preferência de novidades; a janela será exibida.");
     exception.printStackTrace();
   }
 
   if (APP_VERSION.equals(lastViewedVersion)) return;
 
   String message = appDisplayName() + "\n\n"
-    + "What's new:\n"
-    + "- Two export modes: Raw Scan and Wireless Workbench\n"
-    + "- Automatic -75 dB adjustment for WWB export\n"
-    + "- Optimized 25 kHz frequency grid for WWB\n"
-    + "- New Rizzieri RF Manager identity\n"
-    + "- New logo positioning\n"
-    + "- Discreet graph watermark\n"
-    + "- Integrated application versioning";
+    + "- Exportação restaurada ao fluxo estável.\n"
+    + "- Exportação movida para uma aba própria.\n"
+    + "- Marca d'água atualizada.\n"
+    + "- Melhorias na instalação e atualização do aplicativo.";
 
-  javax.swing.JOptionPane.showMessageDialog(null, message, "What's New - " + appDisplayName(),
+  javax.swing.JOptionPane.showMessageDialog(null, message, "Novidades desta versão",
     javax.swing.JOptionPane.INFORMATION_MESSAGE);
 
   if (preferences != null) {
@@ -35,7 +31,7 @@ void showWhatsNewIfNeeded() {
       preferences.flush();
     }
     catch (Exception exception) {
-      println("Unable to store What's New preference.");
+      println("Não foi possível registrar a versão visualizada das novidades.");
       exception.printStackTrace();
     }
   }

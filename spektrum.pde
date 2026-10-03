@@ -40,9 +40,10 @@ final int TAB_HEIGHT_ACTIVE = 30;
 final int TAB_GENERAL = 1;
 final int TAB_MEASURE = 2;
 final int TAB_SETTINGS = 3;
-final int TAB_SARK100 = 4;
+final int TAB_EXPORT = 4;
+final int TAB_SARK100 = 5;
 
-String tabLabels[] = {"global", "SETUP", "MEASURE", "SETTINGS", "NOT YET", "WHO ARE YOU"};
+String tabLabels[] = {"global", "SETUP", "MEASURE", "SETTINGS", "EXPORT", "NOT YET"};
 
 final int ITEM_GAIN = 1;
 final int ITEM_FREQUENCY = 2;
@@ -579,26 +580,6 @@ void setupControls() {
     .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Exit")
     ;
 
-  y += 30;
-
-  cp5.addButton("exportRawScan")
-    .setPosition(x, y)
-    .setSize(width, 20)
-    .setColorBackground(buttonColor)
-    .setColorLabel(buttonColorText)
-    .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Export Raw Scan")
-    ;
-
-  y += 30;
-
-  cp5.addButton("exportToWWB")
-    .setPosition(x, y)
-    .setSize(width, 20)
-    .setColorBackground(buttonColor)
-    .setColorLabel(buttonColorText)
-    .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Export to WWB")
-    ;
-
   uiLines[uiNextLineIndex++][TAB_GENERAL] = 0;
 
   // TAB MEASURE =============================================================================
@@ -922,6 +903,43 @@ void setupControls() {
     .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Relative mode")
     ;
   cp5.getController("toggleRelMode").moveTo(tabLabels[TAB_MEASURE]);
+
+
+  // TAB EXPORT ==========================================================
+  //
+  cp5.addTab(tabLabels[TAB_EXPORT])
+    .setColorBackground(tabColorBachground)
+    .setColorLabel(color(255))
+    .activateEvent(true)
+    .setId(TAB_EXPORT)
+    .setHeight(TAB_HEIGHT)
+    ;
+
+  x = 15;
+  y = 45;
+  uiNextLineIndex = 0;
+  uiLines[uiNextLineIndex++][TAB_EXPORT] = y;
+
+  cp5.addTextlabel("exportLabel")
+    .setText("EXPORTAÇÃO PARA WIRELESS WORKBENCH:")
+    .setPosition(x-13, y)
+    .setColorValue(0xffffff00)
+    .setFont(createFont("ARIAL", 10))
+    ;
+  cp5.getController("exportLabel").moveTo(tabLabels[TAB_EXPORT]);
+
+  y += 35;
+
+  cp5.addButton("exportToWWB")
+    .setPosition(x, y)
+    .setSize(width, 24)
+    .setColorBackground(buttonColor)
+    .setColorLabel(buttonColorText)
+    .getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setText("Export to WWB")
+    ;
+  cp5.getController("exportToWWB").moveTo(tabLabels[TAB_EXPORT]);
+
+  uiLines[uiNextLineIndex++][TAB_EXPORT] = 0;
 
 
   // --------------------------------------------------------------------

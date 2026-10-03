@@ -1,6 +1,6 @@
 # Rizzieri RF Manager
 
-Current product version: **Rizzieri RF Manager v0.1.0**.
+Current product version: **Rizzieri RF Manager v0.1.1**.
 
 Rizzieri RF Manager is based on the original **Spektrum** spectrum analyzer.
 The Spektrum attribution, authors, contributors, copyright, and BSD license are
@@ -15,25 +15,18 @@ The biggest advantage is that it can do sweeps across a large frequency span.
 RF scan export
 ----
 
-The General tab provides two exports based on an isolated snapshot of the current
-`getDbmBuffer()` data. Neither export pauses, restarts, or reconfigures the SDR.
+The dedicated **EXPORT** tab provides the stable Wireless Workbench export restored
+for v0.1.1. It uses an isolated clone of the current `getDbmBuffer()` data and does
+not pause, restart, or reconfigure the SDR.
 
-**Export Raw Scan** writes the corrected frequency and original buffer amplitude.
-It removes invalid floating-point samples, sorts by IF-corrected frequency, and
-preserves the source bins without applying the WWB grid or amplitude offset.
+**Export to WWB** applies IF correction, sorts the frequencies, and, for scans finer
+than 25 kHz, uses sequential 25 kHz windows anchored at the first corrected
+frequency while preserving the strongest amplitude in each window. The CSV has no
+header, uses a period as decimal separator, and preserves the buffer amplitudes.
 
-**Export to WWB** prepares an interoperability file for Shure Wireless Workbench.
-It applies IF correction, sorts the frequencies, reduces scans finer than 25 kHz
-onto an exact 25 kHz grid using the strongest amplitude in each window, and then
-applies a fixed **-75 dB compatibility/visualization offset**.
-
-The -75 dB adjustment is an operational decision for the Wireless Workbench
-workflow. It is not an absolute metrological calibration of the RTL-SDR or the RF
-signal chain.
-
-Both files are headerless CSV files using a period as decimal separator. Suggested
-names are `rizzieri_rf_raw_YYYYMMDD_HHmmss.csv` and
-`rizzieri_rf_wwb_YYYYMMDD_HHmmss.csv`.
+This hotfix does not apply the experimental -75 dB transformation and does not
+provide a separate Raw Scan mode. Those ideas remain deferred until controlled RF
+and Wireless Workbench testing is complete.
 
 User interface part is written in [Processing](https://processing.org/)
 
@@ -189,8 +182,9 @@ Use a valid PNG image. A square canvas of at least 256 x 256 pixels is recommend
 because the same image is also used as the application window icon where supported.
 The interface scales the image proportionally to fit the left control area. If the
 file is absent or cannot be decoded, the application remains functional and shows
-the versioned product name as a text fallback. The same image is drawn as a subtle
-watermark behind the graph at 8% opacity.
+the versioned product name as a text fallback. The graph watermark uses only the
+R symbol extracted in memory from the original asset, rendered in monochrome at
+8% opacity and limited to 50% of the graph area.
 
 The application name and version have a single source of truth in
 `app_identity.pde`. A local Java Preferences entry records the last version whose
